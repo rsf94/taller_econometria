@@ -1,28 +1,90 @@
 ---
-title: "clase01"
+title: "Clase 0: Estimación de un MRLM "
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(car)
+library(tseries)
+library(stargazer)
+datos <- read_xls("consumo.xls", sheet="Hoja1")
+attach(datos) # para no poner signo de $ para seleccionar columnas
 ```
 
 ## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Iniciamos con la lectura de los datos desde R:
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r datos}
+datos
 ```
 
-## Including Plots
+## Estadísticos descriptivos
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+vars <- data.frame(datos$consumption, income, wealth, interest)
+summary(vars)
+boxplot(vars, col="orange", main="Diagrama de caja")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## c) Diagrama de dispersión
+```{r}
+plot(income, consumption, type="p", col="red",
+     main="Diagrama de dispersi?n ingreso vs consumo")
+abline(lm(consumption~income, data=datos),col="blue")
+
+plot(wealth, consumption, type="p", col="red",
+     main="Diagrama de dispersi?n")
+abline(lm(consumption~wealth, data=datos),col="blue")
+
+plot(interest, consumption, type="p", col="red",
+     main="Diagrama de dispersi?n")
+abline(lm(consumption~interest, data=datos),col="blue")
+```
+
+
+## d) Estimación de la regresión
+```{r}
+n<- length(consumption)
+k <- 3
+reg1 <- lm(consumption ~ income + wealth + interest,data=datos)
+
+summary(reg1)
+
+ygorro <- reg1$fitted.values
+ugorro <- reg1$residuals
+sigma2 <- sum(ugorro^2)/(n-k-1)
+```
+## e) Pruebas de hipotesis
+
+```{r}
+
+linearHypothesis(reg1,"income=0")
+linearHypothesis(reg1,"wealth=0")
+linearHypothesis(reg1,"interest=0")
+
+linearHypothesis(reg1,c("income=0","wealth=0","interest=0"))
+```
+
+## f) Intervalos de confianza
+```{r}
+confint(reg1)
+
+
+```
+
+## g) Significancia conjunta y capacidad de predicción
+```{r}
+(fest <- summary(reg1)$fstatistic)
+
+aic <- AIC(reg1)
+
+bic <- BIC(reg1)
+```
+
+
