@@ -32,7 +32,11 @@ summary(vars)
 boxplot(vars, col="orange", main="Diagrama de caja")
 ```
 
+<<<<<<< HEAD
 ## c) Diagrama de dispersión
+=======
+## Diagrama de dispersión
+>>>>>>> e577f29c6352b1a08759e17564ef07bcf983458e
 ```{r}
 plot(income, consumption, type="p", col="red",
      main="Diagrama de dispersi?n ingreso vs consumo")
@@ -45,6 +49,7 @@ abline(lm(consumption~wealth, data=datos),col="blue")
 plot(interest, consumption, type="p", col="red",
      main="Diagrama de dispersi?n")
 abline(lm(consumption~interest, data=datos),col="blue")
+<<<<<<< HEAD
 ```
 
 
@@ -88,3 +93,12 @@ bic <- BIC(reg1)
 ```
 
 
+=======
+```
+
+
+
+
+
+
+>>>>>>> e577f29c6352b1a08759e17564ef07bcf983458e
