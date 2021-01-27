@@ -3,18 +3,50 @@ title: "R Notebook"
 output:
   html_document:
     df_print: paged
+    code_folding: show
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+# Diagrama de causalidad
 
 ```{r}
-plot(cars)
+#install.packages('dagitty')
+
+library(dagitty)
+g1 <- dagitty('dag{
+"Cámara" [pos="0,1"]
+"Atención" [pos="1,0"]
+"Dinamismo" [pos="1,1"]
+"Conexión" [pos="1,2"]
+"Aprendizaje" [pos="2,1"]
+"Cámara" -> "Atención" -> "Aprendizaje"
+"Cámara" -> "Dinamismo" -> "Aprendizaje"
+"Cámara" -> "Conexión" -> "Aprendizaje"
+"Dinamismo" -> "Atención"
+}')
+
+plot(g1)
+
 ```
 
-
+### Agregamos nueva variable
 ```{r}
+g3 <- dagitty('dag{
+"Cámara" [pos="0,1"]
+"Atención" [pos="1,0.5"]
+"Dinamismo" [pos="1,0"]
+"Conexión" [pos="1,1"]
+"Aprendizaje" [pos="2,1"]
+"Privacidad" [pos="0.5,1.5"]
+"Participación" [pos="1,2"]
+"Cámara" -> "Atención" -> "Aprendizaje"
+"Cámara" -> "Dinamismo" -> "Aprendizaje"
+"Cámara" -> "Conexión" -> "Aprendizaje"
+"Cámara" -> "Privacidad" -> "Participación" -> "Aprendizaje"
+"Dinamismo" -> "Atención"
+"Conexión" -> "Participación"
+}')
+
+plot(g3)
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
@@ -23,22 +55,64 @@ When you save the notebook, an HTML file containing the code and output will be 
 
 The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
 
+## Damos formato
+
 ```{r}
+# install.packages('ggdag')
+library(ggplot2)
+library(ggdag)
+
 
 
 ```
 
-```{r}
+## Hilo de relaciones
 
+¿Quién causa el efecto en aprendizaje directamente?
+
+Resto de variables que causan
+```{r}
+parents(g3,"Aprendizaje")
+
+ancestors(g3,"Aprendizaje")
+
+children(g3,"Cámara")
+
+descendants(g3,"Cámara")
+```
+# Prueba FETS
+
+```{r}
+#install.packages('Matching')
+#install.packages('EnvStats')
+
+library(Matching)
+library(EnvStats)
+data(lalonde)
+attach(lalonde)
+
+x <- re78[treat==1]/1000
+y <- re78[treat==0]/1000
+
+twoSamplePermutationTestLocation(x,y,alternative="two.sided", seed=123)
 
 ```
+# Prueba de Neyman
 
 ```{r}
+yiT <- re78[treat==1]/1000
+yiC <- re78[treat==0]/1000
+myiT <- mean(yiT)
+myiC <- mean(yiC)
 
-```
+(tau <- abs(myiT - myiC))
 
-```{r}
+(vartau <- var(re78[treat==1]/1000)/length(yiT)+
+var(re78[treat==0]/1000)/length(yiC))
 
+(tstat <- tau/sqrt(vartau))
+
+2*(1-pnorm(tstat))
 ```
 
 ```{r}
