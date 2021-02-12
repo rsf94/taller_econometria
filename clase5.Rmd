@@ -1,0 +1,165 @@
+---
+title: "Clase 5 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "10/2/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "haven",
+              "stargazer",
+              "magrittr")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## Pipes
+
+### Funciones útiles del paquete dplyr
+filter filtra 
+group_by agrupa
+summarize resume
+
+### Cuando NO usar pipes
+- Cuando el conjunto de instrucciones forma más largos de 10
+- Múltiples inputs y outputs
+- Construcción de gráficos dirigidos con una estructura de dependencia compleja
+
+### Otros tipos de pipes
+- %T>% permite visualizar o guardar un resultado intermedio del flujo de operaciones previo a que concluya
+- %$% permite adjuntar las variables de un conjunto de datos para que puedan ser utilizados de manera individual
+- %<I>% permite realizar una asignacion de doble sentido a un objeto, o sea que reemplaza al objeto original por el transformado
+
+## Lectura de datos
+```{r cars, echo=TRUE}
+file <- "C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/eco_computacional/titanic.dta"
+  titanic <- read_dta(file)
+  attach(titanic)
+  
+```
+## Estadística descriptiva
+```{r, echo=TRUE}
+prueba <- titanic %>% group_by(class,age) %>% summarise(sum(class))
+  
+```
+
+## Estimación del ATE
+```{r, echo=TRUE}
+titanic <- as.data.frame(read_dta(file)) %>%
+  mutate(d=case_when(class==1 ~ 1,TRUE ~ 0))
+
+
+ey1 <- titanic %>%
+    filter(d==1) %>%
+  pull(survived) %>%
+  mean()
+
+ey0 <- titanic %>%
+    filter(d==0) %>%
+  pull(survived) %>%
+  mean()
+
+(hat_ate <- ey1 - ey0)
+
+```
+## Creamos variable identificadora de grupos
+```{r, echo=TRUE}
+
+titanic <- titanic %>%
+  mutate(s=case_when(sex == 0 & age == 1 ~ 1,
+                     sex == 0 & age == 0 ~ 2,
+                     sex == 1 & age == 1 ~ 3,
+                     sex == 1 & age == 0 ~ 4,
+                     TRUE ~ 0))
+
+```
+
+## Estratificación: Superviviencia por grupo estratificado
+
+Obtenemos la probabilidad de sobrevivir estrato por estrato...
+```{r, echo=TRUE}
+ey11 <- titanic %>%
+    filter(s == 1& d==1) %$%
+  mean(survived)
+
+ey10 <- titanic %>%
+    filter(s == 1& d==0) %$%
+  mean(survived)
+
+ey21 <- titanic %>%
+    filter(s == 2& d==1) %$%
+  mean(survived)
+
+ey20 <- titanic %>%
+    filter(s == 2& d==0) %$%
+  mean(survived)
+
+ey31 <- titanic %>%
+    filter(s == 3& d==1) %$%
+  mean(survived)
+
+ey30 <- titanic %>%
+    filter(s == 3& d==0) %$%
+  mean(survived)
+
+ey41 <- titanic %>%
+    filter(s == 4& d==1) %$%
+  mean(survived)
+
+ey40 <- titanic %>%
+    filter(s == 4& d==0) %$%
+  mean(survived)
+
+c(ey10,ey11,ey20,ey21,ey30,ey31,ey40,ey41)
+
+```
+
+Diferencias por estrato
+```{r, echo=TRUE}
+diff1 = ey11 - ey10
+diff2 = ey21 - ey20
+diff3 = ey31 - ey30
+diff4 = ey41 - ey40
+
+(c(diff1,diff2,diff3,diff4))
+
+# Para el cáluclo de los ponderadores definimos:
+
+obs <- nrow(titanic)
+
+```
+
+Estimación de los ponderadores
+
+Obtenemos el efecto de pertenecer a primera clase (treatment effect)
+```{r, echo=TRUE}
+wt1 <- titanic %>%
+  filter(s==1 & d==0) %$%
+  nrow(.)/obs
+
+wt2 <- titanic %>%
+  filter(s==2 & d==0) %$%
+  nrow(.)/obs
+
+wt3 <- titanic %>%
+  filter(s==3 & d==0) %$%
+  nrow(.)/obs
+
+wt4 <- titanic %>%
+  filter(s==4 & d==0) %$%
+  nrow(.)/obs
+
+weighted_ate <- diff1*wt1 + diff2*wt2 + diff3*wt3 +  diff4*wt4
+
+stargazer(weighted_ate,hat_ate,type="text")
+```
