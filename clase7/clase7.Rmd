@@ -1,0 +1,138 @@
+---
+title: "Clase 7 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "24/02/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "haven",
+              "stargazer",
+              "magrittr",
+              "kableExtra",
+              "knitr")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## kableExtra
+Este paquete nos permite crear tablas con buen formato en R
+
+```{r, echo=TRUE}
+datos <- mtcars[1:8,1:6]
+kbl(datos,booktabs=T, linesep="") %>%
+  kable_styling(position="center", 
+                latex_options=c("striped","HOLD_position"), 
+                stripe_index = c(1,2,5:6),
+                full_width=F,
+                font_size = 8)
+```
+Podemos agregar encabezados y pies de página
+
+```{r, echo=TRUE}
+kbl(datos,booktabs=T, linesep="") %>%
+  add_header_above(c("", "Group 1" = 3,"Group 2" = 3)) %>%
+  kable_styling(position="center", 
+                latex_options=c("striped","HOLD_position"), 
+                stripe_index = c(1,2,5:6),
+                full_width=F,
+                font_size = 8) %>%
+  footnote(general="Own ellaboration")
+
+```
+ 
+# _Race and Marriage in the Labor Market: A Discrimination Correspondence Study in a Developing Country_
+
+```{r, echo=FALSE}
+file <- "C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/taller_econometria/taller_econometria/clase7/RMLM.dta"
+  data <- read_dta(file)
+  attach(data)
+  
+```
+
+## 
+
+```{r, echo=TRUE}
+data %>% filter(all8==1) %>%
+  group_by(photo) %>%
+  summarize(Edad=mean(age),
+            Sexo=mean(sex),
+            Casado=mean(married),
+            BPub=mean(public_highschool),
+            UPub=mean(public_college),
+            Beca=mean(scholarship),
+            Llamado=mean(callback)) %>%
+  kbl(booktabs=T,
+      caption = "Características del grupo por raza",
+      col.names=c("Raza","Edad","Sexo","Casado","BPub","UPub","Beca","Llamado"), digits=c(0,2,2,2,2,2,2,2)) %>%
+  kable_styling(position="center", latex_options=c("striped","HOLD_position"), full_width=F)
+  
+```
+# Replicaremos la tabla
+```{r, echo=TRUE}
+
+dt8 <- subset(data,all8==1)
+
+wa <- subset(dt8,sex==1)
+ws <- subset(dt8,sex==1 & married ==0)
+ma <- subset(dt8,sex==0)
+ms <- subset(dt8,sex==0 & married == 0)
+
+par1 <- table(wa$callback, wa$photo)
+round(100*prop.table(par1,2),2)
+chisq.test(par1)
+
+par2 <- table(ws$callback, ws$photo)
+round(100*prop.table(par2,2),2)
+chisq.test(par2)
+
+
+pbr1 <- table(ma$callback, ma$photo)
+round(100*prop.table(pbr1,2),2)
+chisq.test(pbr1)
+
+pbr2 <- table(ms$callback, ms$photo)
+round(100*prop.table(pbr2,2),2)
+chisq.test(pbr2)
+
+```
+# Regresiones tabla 2
+```{r comment='', echo=FALSE, results='asis'}
+
+reg1<-lm(callback~sex+public_college+married+
+           photo1+photo2+photo4+ss_degree+scholarship
+         +public_highschool+other_language+some_availab+leadership+age+english)
+
+reg2<-lm(callback~public_college+married+
+           photo1+photo2+photo4+ss_degree+scholarship+public_highschool
+         +other_language+some_availab+leadership+age+english,data=wa)
+
+reg3<-lm(callback~public_college+married+
+           photo1+photo2+photo4+ss_degree+scholarship+public_highschool
+         +other_language+some_availab+leadership+age+english,data=ma)
+
+rvar1 <- sandwich::vcovBS(reg1,cluster = id_offer)
+rvar2 <- sandwich::vcovBS(reg2,cluster = wa$id_offer)
+rvar3 <- sandwich::vcovBS(reg3,cluster = ma$id_offer)
+
+rse1<- sqrt(diag(rvar1))
+rse2<- sqrt(diag(rvar2))
+rse3<- sqrt(diag(rvar3))
+
+
+stargazer(reg1,reg2,reg3,type='latex',se=list(rse1,rse2,rse3),
+          omit=c("ss_degree","scholarship","public_highschool","other_language",
+                 "some_availab","leadership","age","english"),table.placement = "H")
+
+```
+  
