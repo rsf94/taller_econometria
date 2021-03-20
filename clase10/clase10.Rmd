@@ -1,0 +1,85 @@
+---
+title: "Clase 10 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "17/03/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "knitr",
+              "devtools",
+              "Synth")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## 1. Synthetic Control
+
+```{r,results='asis',echo=FALSE}
+
+filepath <- "C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/taller_econometria/taller_econometria/clase10/smoking.rda"
+
+load(filepath)
+
+stateno <- as.numeric(smoking$state)
+
+base <- data.frame(smoking,stateno)
+
+```
+El periodo de tiempo abarca de 1970 a 2000, 19 años luego de la aplicación del tratamiento, con una muestra de 38 estados, pues para el diseño del control sintético se omitieron
+- 4 estados por programas de control de tabaco
+- 7 estados con incrementos en su impuesto a tabaco de $0.50 o más
+- DC
+
+# Preparación de los datos
+```{r, echo=TRUE}
+basecs <- dataprep(
+  foo=base,
+  predictors = c("lnincome","age15to24","retprice"),
+  predictors.op = "mean",
+  special.predictors=list(
+    list("beer",1984:1988,"mean"),
+    list("cigsale",1975,"mean"),
+    list("cigsale",1980,"mean"),
+    list("cigsale",1980,"mean")),
+  time.predictors.prior=1980:1988,
+  dependent = "cigsale",
+  unit.variable="stateno",
+  time.variable = "year",
+  treatment.identifier = 3,
+  controls.identifier = c(1:2,4:38),
+  time.optimize.ssr = 1970:1988,
+  time.plot = 1970:2000)
+
+```
+
+# Diseño del control sintético    
+```{r}
+resultadocs <- synth(data.prep.obj = basecs)
+
+tablacs <- synth.tab(
+  synth.res = resultadocs,
+  dataprep.res = basecs,
+  round.digit = 3)
+
+tablacs
+```
+
+```{r}
+
+```
+
+```{r}
+
+
+```

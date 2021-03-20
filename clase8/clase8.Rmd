@@ -1,0 +1,106 @@
+---
+title: "Clase 8 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "24/02/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "haven",
+              "magrittr",
+              "kableExtra",
+              "knitr",
+              "devtools",
+              "causalweight",
+              "car")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## 1. Límites de Horowitz-Manski
+
+```{r,results='asis',echo=FALSE}
+
+filepath <- "C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/taller_econometria/taller_econometria/clase8/cancer.dta"
+
+data <- as.data.frame(read_dta(filepath))
+
+#str(data)
+
+data$tratamiento <- car::recode(data$drug,"1=0;2:3=1")
+
+# información solo disponible para aquellos que sí murieron
+data <- data %>% mutate(studytime= ifelse(died==0,NA,studytime))
+
+
+
+hm_upper <- max(na.omit(data$studytime))
+hm_lower <- min(na.omit(data$studytime))
+
+data <- data %>% mutate(hm_up = ifelse(is.na(studytime) & tratamiento == 1,hm_upper,
+                                   ifelse(is.na(studytime) & tratamiento == 0,hm_lower,
+                                        studytime)))
+
+                        
+                        
+data <- data %>% mutate(hm_low = ifelse(is.na(studytime) & tratamiento == 1,hm_lower,
+                                   ifelse(is.na(studytime) & tratamiento == 0,hm_upper,
+                                        studytime)))
+
+l_1 <- mean(data$hm_low[data$tratamiento == 1])
+u_1 <- mean(data$hm_up[data$tratamiento == 1])
+
+l_0 <- mean(data$hm_low[data$tratamiento == 0])
+u_0 <- mean(data$hm_up[data$tratamiento == 0])
+
+(ate <- c(l_1-l_0,u_1-u_0))
+
+```
+
+## 2. Límites de Lee
+
+```{r,results='asis',echo=FALSE}
+install_github("vsemenova/leebounds")
+library(leebounds)
+
+leedata <- data.frame(treat=data$tratamiento,selection=data$died,outcome=data$studytime)
+GetBounds(leebounds(leedata))
+
+```
+
+## 3. Ponderación de probabilidad inversa
+
+
+```{r,results='asis',echo=FALSE}
+data <- data %>% filter(!is.na(studytime))
+ipw <- treatweight(data$studytime, data$tratamiento, data$age, data$died)
+
+(ate_ipw<- ipw$y1 - ipw$y0)
+
+
+```
+
+## Comparación
+
+```{r,results='asis',echo=FALSE}
+ate_1 <- ate
+ate_2 <- GetBounds(leebounds(leedata))
+ate_3 <- c(ipw$y0,ipw$y1)
+
+
+resultados <- round(cbind(c(ate_1[1],ate_2[1],ate_3[1]),c(ate_1[2],ate_2[2],ate_3[2])),4)
+resultados <- cbind(resultados,c("Horowitz","Lee","IPW"))
+
+kable(resultados,booktabs=T,col.names=c("low","high","Método")) %>%
+  kable_styling(position="center",latex_options=c("HOLD_position"))
+```

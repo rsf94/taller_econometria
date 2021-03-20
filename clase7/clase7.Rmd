@@ -13,7 +13,9 @@ packages <- c("tidyverse",
               "stargazer",
               "magrittr",
               "kableExtra",
-              "knitr")
+              "knitr",
+              "devtools",
+              "causalweight")
 
 installed_packages <- packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
@@ -135,4 +137,82 @@ stargazer(reg1,reg2,reg3,type='latex',se=list(rse1,rse2,rse3),
                  "some_availab","leadership","age","english"),table.placement = "H")
 
 ```
-  
+
+# Clase 8
+```{r}
+
+hm_upperbound <- max()
+hm_lowebound <- min()
+
+data <- data %>%
+  mutate(hm_upperbound = ifelse(is.na(outcome) & treatment == 1, hm_upperbound,outcome))
+
+data <- data %>%
+  mutate(hm_upperbound = ifelse(is.na(outcome) & treatment == 0, hm_lowerbound,outcome))
+
+
+# Límite de Lee
+leedata = data.frame(treat = tratamiento, selection = presente, outcome = resultado)
+
+# Obtener los límites
+GetBounds(leebounds(leedata))
+
+# Puede obtener el resto de resultados de la función original
+leebounds(leedata)
+
+# Igual puede probar las funciones auxiliares
+basic_trimmed_moments()
+compute_confidence_region()
+
+# Ponderación de probabilidad inversa
+#y: variable de interés
+#x: regresora
+#t treatment: dicotómica de trtamiento
+causalweight::treatweight(data$y , data$treatment , data$x)
+
+```
+
+```{r}
+
+filepath <- "C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/taller_econometria/taller_econometria/clase8/cancer.dta"
+data <- as.data.frame(read_dta(filepath))
+attach(data)
+
+superv <- ifelse(died==1,studytime,NA)
+data <- cbind(data,superv)
+
+hm_upperbound <- max(na.omit(data$studytime))
+hm_lowerbound <- min(na.omit(data$studytime))
+
+str(data)
+data$tratamiento <- car::recode(drug," 1=0 ; 2:3=1")
+
+
+data <- data %>%
+  mutate(hm_upperbound = ifelse(is.na(superv) & drug == 1, hm_upperbound,superv))
+
+data <- data %>%
+  mutate(hm_upperbound = ifelse(is.na(superv) & drug == 0, hm_lowerbound,superv))
+
+
+data <- data %>%
+  mutate(hm_lowerbound = ifelse(is.na(superv) & drug == 1, hm_lowerbound,superv))
+
+data <- data %>%
+  mutate(hm_lowerbound = ifelse(is.na(superv) & drug == 0, hm_upperbound,superv))
+
+
+ate <- superv
+
+install_github("vsemenova/leebounds")
+library(leebounds)
+
+leedata <- data.frame(treat=tratamiento,selection=died,outcome=studytime)
+GetBounds(leebounds(leedata))
+
+
+treatweight(data$studytime, data$tratamiento,data$age)
+
+
+
+```
