@@ -85,6 +85,11 @@ cor(data  %>% select(education,distance,wage))
 m1 <- lm(log(education) ~ distance, data=data)
 summary(m1)$r.squared
 
+install.packages("corrplot")
+library(corrplot)
+correlacion<-round(cor(data  %>% select(education,distance,wage)),3)
+corrplot(correlacion, method="number", type="upper")
+
 ```
 La correlación entre distancia y educación es negativa y pequeña, por lo que la distancia explica muy poca variación de la educación. Quisiéramos que esta correlación fuera alta para cumplir con el supuesto de relevancia. Esto también lo comprobamos con la R cuadrada de la regresión de la primera etapa que utiliza la distancia como regresor, mientras que la variable independiente es la educación.
 
@@ -158,6 +163,8 @@ stargazer(SSH_1,type="text")
 En el modelo 1 la v (residual) no es significativa, por lo tanto no se rechaza H0 y no existe evidencia en contra de la exogeneidad, sí se recomienda utilizar IV.
 ```{r}
 # Relevancia de los instrumentos 
+
+
   # Tomando la ecuacion de la primera etapa y, dado que en esta el unico instrumento es la distancia, no es necesario realizar una prueba conjunta. Se advierte que este coeficiente es significativo, por lo tanto el instrumento es relevante.
   
 # Exogeneidad de los instrumentos
