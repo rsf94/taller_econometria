@@ -1,0 +1,189 @@
+---
+title: "Clase 12 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "07/04/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "knitr",
+              "devtools",
+              "AER",
+              "lmtest",
+              "sandwich",
+              "AER",
+              "stargazer",
+              "car")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## 2
+
+```{r,results='asis',echo=FALSE}
+
+data("CollegeDistance")
+
+data <- CollegeDistance
+
+str(data)
+summary(data)
+
+typeof(data$gender)
+
+hist(data$distance)
+
+```
+
+# 3
+```{r}
+m1 <- lm(log(wage) ~ log(education), data=data)
+
+m2 <- lm(log(wage) ~ log(education) + gender + urban + ethnicity, data=data)
+  
+stargazer(m1,m2,type='text')
+
+```
+En la columna 1: Ante un aumento de 1% en la educación, se espera un aumento de 0.029% en el salario. El coeficiente es significativo al 10%
+En la columna 2: El coeficiente de educación se vuelve estadísticamente no significativo. Por otro lado, los coeficientes de etnicidad y género sí son estadísticamente significativos.
+
+
+
+# 4
+La distancia influye en la decisión de estudiar, por lo tanto la distancia a la escuela sí está relacionada con la educación; pero no necesariamente con el salario, ni con otras variables como el género, la etnicidad, etc.
+
+Sin embargo, también puede haber problemas al usar la distancia como instrumento. Por ejemplo, si las familias que valoran mucho la educación se pueden mudar a lugares más cercanos a la escuela y los niños de dichas familias podrían tener mayor habilidad o estar más motivados, lo que se reflejaría en mayores salarios. Esto induciría una correlación positiva entre la distancia y variables no observadas determinantes de los salarios.
+
+Otro posible problema es si los lugares más cercanos a la escuela tuvieran mercados laborales más sólidos.
+
+
+# 5
+```{r}
+cor(data  %>% select(education,distance,wage))
+
+m1 <- lm(log(wage) ~ log(education), data=data)
+summary(m1)$r.squared
+
+```
+La correlación entre distancia y educación es negativa y pequeña, por lo que la distancia explica muy poca variación de la educación. Quisieramos que esta correlación fuera alta para cumplir con el supuesto de relevancia.
+
+La correlación entre distancia y salario es casi nula.
+
+
+# 6
+```{r}
+m1_iv <- ivreg(log(wage) ~ log(education) | distance , data=data)
+coeftest(m1_iv,vcov=vcovHC,type="HC1")
+
+m2_iv <- ivreg(log(wage) ~ log(education) + gender + urban + ethnicity | distance + gender + urban + ethnicity ,data=data)
+coeftest(m2_iv,vcov=vcovHC,type="HC1")
+
+summary(m1_iv)
+summary(m2_iv)
+
+
+# BORRAR
+
+m_etapa1 <- lm(log(education) ~ distance ,data=data)
+
+m_freducida <- m1
+
+eta <- summary(m_etapa1)$coefficients[2]
+gamma <- summary(m_freducida)$coefficients[2]
+
+gamma/eta
+
+
+```
+
+# 7
+```{r}
+m_etapa1 <- lm(log(education) ~ distance ,data=data)
+data2 <- cbind(data,m_etapa1$fitted.values)
+
+data2 <- data2 %>% rename(x_gorro =15 )
+
+m_etapa2 <- lm(log(wage) ~ x_gorro, data=data2)
+summary(m_etapa2)
+
+# modelo 2
+m_etapa2 <- lm(log(education) ~ distance ,data=data)
+data2 <- cbind(data,m_etapa1$fitted.values)
+
+data2 <- data2 %>% rename(x_gorro =15 )
+
+m_etapa2 <- lm(log(wage) ~ x_gorro + gender + urban + ethnicity, data=data2)
+summary(m_etapa2)
+```
+
+#  9
+```{r}
+#MODELO 1
+#Prueba de Endogeneidad Hausman
+#Primera etapa
+FSH_1 <- lm(log(education) ~ distance,
+            data = CollegeDistance)
+summary(FSH_1)
+residual1<- residuals(FSH_1)
+  
+#Segunda Etapa
+SSH_1 <-lm(log(wage) ~ log(education) + residual1,
+             data=CollegeDistance)
+stargazer(SSH_1,type="text")
+```
+En el modelo 1 la v (residual) no es significativa, por lo tanto no se rechaza H0 y no existe evidencia en contra de la exogeneidad, sí se recomienda utilizar IV.
+```{r}
+# Relevancia de los instrumentos 
+  # Tomando la ecuacion de la primera etapa, se obtiene la prueba conjunta F
+linearHypothesis(FSH_1)
+  # el F statistic es menor que 1 entonces es un instrumento debil
+
+# Exogeneidad de los instrumentos
+
+FALTA
+
+
+#MODELO 2 
+
+#Prueba de Homogeneidad Hausman
+#Primera etapa
+FSH_2<- lm(log(education) ~ distance + gender + urban + ethnicity,
+          data=CollegeDistance)
+summary(FSH_2)
+residuales2<- residuals(FSH_2)
+
+#Segunda Etapa
+SSH_2<- lm(log(wage) ~ log(education)+ gender+ ethnicity + urban +  residuales2, 
+          data=CollegeDistance)
+summary(SSH_2)
+
+
+#Relevancia de los instrumentos 
+summary(FSH_1)$fstatistic
+summary(FSH_2)$fstatistic
+```
+EL F statistic es considerablemente mayor a 10, por lo tanto se considera que en conjunto las variables instrumentales sí son relevantes para el modelo.
+
+```{r}
+# exogeneidad de los instrumentos
+
+
+#validar las pruebas
+summary(m1_iv, vcov=sandwich, diagnostics=TRUE)
+summary(m2_iv, vcov=sandwich, diagnostics=TRUE)
+```
+
+#10
+Como vimos en el inciso anterior, obtenemos estadísticos F por encima de 10. Lo cual no sugiere que los instrumentos sean débiles.
+No obstante, es importante hacer un análisis cualitativo y preguntarnos posibles causas que pueden hacer que el instrumento sea débil. Dichas causas las mencionamos en el inciso 4 y fueron comentadas por Card (1993).
+
