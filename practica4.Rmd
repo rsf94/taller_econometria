@@ -1,0 +1,215 @@
+---
+title: "Práctica 4"
+author: "Cynthia Valdivia"
+        "Daniela Brito"
+        "Héctor Nuñez Vega"
+        "Rafael Sandoval"
+date: "5/5/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages('huxtable')
+install.packages('here')
+
+library(here)
+library(haven)
+library(huxtable)
+library(scales)
+library(tidyverse)
+library(stargazer)
+library(fastDummies)
+```
+
+#1 De acuerdo al contexto del problema, defina quién es el grupo de tratamiento, quién es el grupo de control, la dimensión temporal, el tratamiento y el efecto causal a medir.
+
+El efecto que se busca analizar es el impacto que tiene la introducción de publicidad de televisión sobre los periódicos locales y nacionales. 
+
+El grupo de tratamiento son los periódicos nacionales
+
+El grupo de control son los periódicos locales
+
+La dimensión temporal es del año 1960 al 1974
+
+
+
+#2. Luego de leer su conjunto de datos, determine las dimensiones del mismo. ¿De qué tamaño es la muestra? ¿Cuántas observaciones dispone para cada grupo? ¿Cuántas en la dimensión temporal?
+
+La base está compuesta está compuesta por 1,196 filas y 52 columnas
+
+Tenemos 1,016 observaciones de periódicos locales y 180 de periódicos nacionales, de las cuales todas se encuentran en la dimensión temporal. Aunado a esto, periódicos en total son 80, de los cuales 68 son locales y 12 son nacionales. 
+
+
+```{r}
+#1
+data <- read_dta(("Angelucci_Cage_AEJMicro_dataset.dta"))
+dim(data)
+count(data,year)
+count(data,local)
+View(data)
+
+length(unique(data$id_news))
+
+#Comprobación de que todas están dentro de la dimensión temporal 
+
+dat <- data %>% select(year,id_news, local) %>% filter(year>="1960" & year <= "1974") 
+
+dat_local<- dat %>% filter(local == 1)  %>% select(year,id_news, local)
+dat_nacional<- dat %>% filter(local == 0) %>% select(year,id_news, local)
+
+
+count(dat_local,local)
+count(dat_nacional,local)
+
+length(unique(dat_local$id_news))
+length(unique(dat_nacional$id_news))
+
+```
+
+
+#3. El conjunto de información es muy amplio por lo que seleccione solo las variables de interés tanto para los periódicos nacionales como para los locales. ¿Puede replicar los estadísticos descriptivos que se muestran en las tablas 1 y 2 (pp. 333-334)?
+
+```{r}
+
+data <- data %>% 
+  dplyr::select(year, id_news, after_national, local, national, # Diff in diff variables
+                ra_cst, qtotal, ads_p4_cst, ads_s, # Advertising side dependents
+                ps_cst, po_cst, qtotal, qs_s, rs_cst, nb_journ, pages, news_hole, ads_q ) %>% #Reader side dependents
+  mutate(ra_cst_div_qtotal = ra_cst / qtotal) %>% # An advertising side dependents needs to be built
+  mutate_at(vars(id_news, after_national, local, national), ~as.factor(.)) %>% # Change some to factors
+  mutate(year = as.integer(year)) %>%
+  mutate(total_revenues = rs_cst + ra_cst
+)
+
+
+data_national <- as.matrix(data %>% filter(national==1) %>%
+  select(-c(year,id_news,after_national,local,national,1)))
+  
+data_local <- as.matrix(data %>% filter(local==1) %>%
+  select(-c(year,id_news,after_national,local,national)))
+
+stargazer(data_national , type='text',na.omit=T, summary=T, omit=1)
+
+stargazer(data_local , type='text',na.omit=T, summary=T,omit=1)
+
+
+```
+
+
+#4. Verifique gráficamente cómo se muestra el cambio en ingresos por publicidad sobre el tiempo tanto para periódicos nacionales como locales. Marque el año del tratamiento.
+```{r}
+# cambiar eje de x <- Listo
+data %>% 
+  mutate(type = if_else(local == 1, "Local", "National")) %>% 
+  ggplot(aes(x = year, y = ra_cst, shape= local)) +
+  geom_point(alpha = 0.5) +
+  scale_x_continuous(labels = as.character(data$year), breaks = data$year) + 
+  scale_y_continuous(labels = dollar_format(prefix="$", suffix = "M", scale = 0.000001)) +
+  labs(x = "Year",
+       y = "Advertising revenue") +
+  facet_wrap(vars(type),
+             nrow = 2) +
+  theme_classic() +
+  geom_vline(xintercept = 1966.5, linetype = "dashed", color= "dark green") 
+  
+  
+
+```
+
+#5. Estime la ecuación 1´ (345) tanto para las variables del lado publicitario como para las del lado de los consumidores (los resultados se aproximan a los de las tablas 3 y 4). Interprete estos resultados en el contexto del problema.
+```{r}
+
+#Interpretar resultados
+
+#4
+ad_revenue                 <- lm(log(ra_cst) ~ after_national + id_news + year, data = data)
+ad_revenue_div_circulation <- lm(log(ra_cst_div_qtotal) ~ after_national + id_news + year, data = data)
+ad_price                   <- lm(log(ads_p4_cst) ~ after_national + id_news + year, data = data)
+ad_space                   <- lm(log(ads_s) ~ after_national + id_news + year, data = data)
+
+
+
+#5
+subscription_price <- lm(log(ps_cst) ~ after_national + id_news + year, data = data)
+unit_price <- lm(log(po_cst) ~ after_national + id_news + year, data = data)
+circulation <- lm(log(qtotal) ~ after_national + id_news + year, data = data)
+share_of_sub <- lm(log(qs_s) ~ after_national + id_news + year, data = data)
+revenue_from_sales <- lm(log(rs_cst) ~ after_national + id_news + year, data = data)
+
+```
+
+#6. ¿La diferencia en la variable de respuesta es significativa luego del tratamiento? ¿para qué casos?
+
+Interpretar resultados la $\beta_1$
+
+```{r}
+#6
+omit_me <- c("(Intercept)", "id_news3", "id_news6", "id_news7", "id_news13", 
+             "id_news16", "id_news25", "id_news28", "id_news34", "id_news38", 
+             "id_news44", "id_news48", "id_news51", "id_news53", "id_news54", 
+             "id_news57", "id_news60", "id_news62", "id_news66", "id_news67", 
+             "id_news70", "id_news71", "id_news72", "id_news80", "id_news82", 
+             "id_news88", "id_news95", "id_news97", "id_news98", "id_news103", 
+             "id_news105", "id_news106", "id_news118", "id_news119", "id_news127", 
+             "id_news136", "id_news138", "id_news148", "id_news151", "id_news153", 
+             "id_news154", "id_news157", "id_news158", "id_news161", "id_news163", 
+             "id_news167", "id_news169", "id_news179", "id_news184", "id_news185", 
+             "id_news187", "id_news196", "id_news206", "id_news210", "id_news212", 
+             "id_news213", "id_news224", "id_news225", "id_news234", "id_news236", 
+             "id_news245", "id_news247", "id_news310", "id_news452", "id_news467", 
+             "id_news469", "id_news480", "id_news20040", "id_news20345", 
+             "id_news20346", "id_news20347", "id_news20352", "id_news20354", 
+             "id_news21006", "id_news21025", "id_news21173", "id_news21176", 
+             "id_news33718", "id_news34689", "id_news73")
+
+huxreg("Ad. rev." = ad_revenue, 
+       "Ad rev. div. circ." = ad_revenue_div_circulation, 
+       "Ad price" = ad_price, 
+       "Ad space" = ad_space,
+       omit_coefs = omit_me, 
+       number_format = 2
+)
+
+#7
+omit_me <- c("(Intercept)", "id_news3", "id_news6", "id_news7", "id_news13", 
+             "id_news16", "id_news25", "id_news28", "id_news34", "id_news38", 
+             "id_news44", "id_news48", "id_news51", "id_news53", "id_news54", 
+             "id_news57", "id_news60", "id_news62", "id_news66", "id_news67", 
+             "id_news70", "id_news71", "id_news72", "id_news80", "id_news82", 
+             "id_news88", "id_news95", "id_news97", "id_news98", "id_news103", 
+             "id_news105", "id_news106", "id_news118", "id_news119", "id_news127", 
+             "id_news136", "id_news138", "id_news148", "id_news151", "id_news153", 
+             "id_news154", "id_news157", "id_news158", "id_news161", "id_news163", 
+             "id_news167", "id_news169", "id_news179", "id_news184", "id_news185", 
+             "id_news187", "id_news196", "id_news206", "id_news210", "id_news212", 
+             "id_news213", "id_news224", "id_news225", "id_news234", "id_news236", 
+             "id_news245", "id_news247", "id_news310", "id_news452", "id_news467", 
+             "id_news469", "id_news480", "id_news20040", "id_news20345", 
+             "id_news20346", "id_news20347", "id_news20352", "id_news20354", 
+             "id_news21006", "id_news21025", "id_news21173", "id_news21176", 
+             "id_news33718", "id_news34689", "id_news73")
+
+huxreg("Subscription price" = subscription_price, 
+       "Unit price" = unit_price, 
+       "Circulation" = circulation, 
+       "Share of sub" = share_of_sub,
+       "Revenue from sales" = revenue_from_sales,
+       omit_coefs = omit_me, 
+       number_format = 2
+)
+
+```
+
+
+Como bien sabemos, los autores buscan examinar el efecto de la reducción de los ingresos publicitarios en el contenido de los periódicos y sus precios. En este sentido, lo que se está analizando en esta tabla es el efecto sobre los precios específicamente desde el lado del lector. Esto indica una disminución en de 4% en el precio de la suscripción al periódico a nivel nacional, comparado con el precio del nivel local (con un 95% de significancia estadística). Asimismo se observa un aumento del 6% en el precio unitario del periódico a nivel nacional respecto al precio unitario a nivel local (con un 99% de significancia estadística) En el caso de la circulación y de los ingresos por por ventas se observa un efecto del 6%; sin embargo, en estos casos se observa una disminución más que un aumento de esta magnitud (como en el caso del precio unitario) y esto tiene sentido, ya que el precio a nivel intuitivo, se pensaría que guarda una relación negativa con los ingresos. Por el lado de del \textit{share} de las subscripciones, se observa un aumento del 19% (siendo este el impacto más fuerte) en la proporción de suscripciones a nivel nacional en comparación con esta proporción (\textit{share}) a nivel local. El efecto después del tratamiento resulta significativo para todas las variables analizadas al menos con un nivel de significancia estadística del 95%. 
+
+#7. Comente la forma en que los autores prueban el supuesto de ‘tendencias paralelas” en este caso (pp. 350-351). Bonus: ¿Puede replicar estos resultados?
+```{r}
+
+
+
+```
