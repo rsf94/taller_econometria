@@ -1,0 +1,107 @@
+---
+title: "Clase 11 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "24/03/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "knitr",
+              "devtools",
+              "AER",
+              "lmtest",
+              "sandwich",
+              "ggdag")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## 1. The Fulton Fish Market
+
+```{r,results='asis',echo=FALSE}
+
+filepath <- "C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/taller_econometria/taller_econometria/clase11/Fulton.csv"
+
+data<-read.csv(filepath)
+
+str(data)
+
+data$Date <- as.Date(as.character(data$Date), format='%y%m%d')
+
+ggplot(data,aes(x=Date))+
+geom_col(aes(y=q))
+```
+
+# Gráficas
+```{r}
+
+  ggplot(data=data,aes(x = Date, y = exp(q))) +
+    geom_col() +
+    labs(
+      title = "Figure 2",
+      subtitle = "Daily Volumes of Whiting",
+      x = "Date (December 2, 1991-May 8, 1992)",
+      y = "Quantity (pounds)"
+      )
+```
+```{r}
+library(ggdag)
+
+dagify(
+  q ~ p, 
+  p ~ Stormy
+  ) %>% 
+  ggdag(seed = 12) +
+  theme(
+    panel.background = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank()
+    )
+```
+
+
+```{r, echo=TRUE}
+m1 <- lm(q~p,data=data)
+stargazer(m1,type='text')
+
+m2 <- lm(q ~ p +  Mon + Tue + Wed + Thu + Cold + Rainy,data=data)
+
+
+
+# Columna 3 y 4 IV
+
+forma_reducida <- lm(q~Stormy,data=data)
+primera_etapa <- lm(p~Stormy,data=data)
+
+beta_iv <- forma_reducida$coefficients[2]/primera_etapa$coefficients[2]
+beta_iv
+
+m3<-ivreg(q ~ p | Stormy, data=data)
+coeftest(m3,vcov=vcovHC,type="HC1")
+
+m4 <- ivreg(q ~ p + Mon + Tue + Wed + Thu + Rainy + Cold|Stormy + Mon + Tue + Wed + Thu + Rainy + Cold, data=data)
+
+
+stargazer(m1,m2,m3,m4, type='text')
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+
+```

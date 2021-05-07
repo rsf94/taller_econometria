@@ -1,0 +1,142 @@
+---
+title: "Clase 13 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "14/04/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "knitr",
+              "devtools",
+              "lmtest",
+              "sandwich",
+              "AER",
+              "stargazer",
+              "plm",
+              "wooldridge",
+              "gplots")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## 2
+
+```{r,results='asis',echo=FALSE}
+data('crime2')
+data <- crime2
+rm(crime2)
+
+#data <- pdata.frame(data,index=c("ivar","tvar"))
+#data <- pdata.frame(data,index=n)
+
+# Tenemos un panel balanceado
+data <- pdata.frame(data,index=46)
+pdim(data)
+
+
+str(data)
+summary(data)
+
+stargazer(data,type='text')
+
+plotmeans(crmrte ~ year,
+          main="Heterogeneidad por año",
+          data=data)
+
+plotmeans(crmrte ~ id,
+          main="Heterogeneidad por id",
+          data=data)
+
+reg1 <- plm(crmrte~unem,
+            data=data,
+            modelo="fd")
+
+reg2 <- plm(crmrte~unem,
+            data=data)
+
+summary(reg2)
+stargazer(reg1,reg2,type='text')
+
+```
+
+# 3
+```{r}
+data$cr.l <- lag(data$crmrte)
+data$cr.d <- diff(data$crmrte)
+data$cr.B <- Between(data$crmrte)
+data$cr.W <- Within(data$crmrte)
+
+data[1:24,c('year','crmrte','cr.l','cr.d','cr.B','cr.W')]
+```
+
+# 5
+```{r}
+
+data('crime4')
+data2 <- crime4
+rm(crime4)
+
+#data <- pdata.frame(data,index=c("ivar","tvar"))
+#data <- pdata.frame(data,index=n)
+
+# Tenemos un panel balanceado
+data2 <- pdata.frame(data2,index=c("county","year"))
+
+reg <- plm(log(crmrte)~d83+d84+d85+d86+d87+lprbarr+lprbconv+lprbpris+lavgsen+lpolpc,
+           data=data2,
+           model='fd')
+
+coeftest(reg,vcovHC)
+
+```
+
+
+
+# Estimación con Efectos Fijos
+
+El estimador intragrupos o de efectos fijos para ser consistente requiere que $u_{i,t}$ no esté correlacionado con $X_{it}$ en todos los periodos.
+
+Al igual que el estimador de primeras diferencias, el estimador intragrupos permite cualquier tipo de correlación entre $a_i$ y las variables explicativas y también desaparecerán las variables explicativas que sean constantes en el tiempo.
+
+Para el caso más comúin de $n$ grande y $T$ pequeño, la elección entre primeras diferencias o intragrupos se basa en la eficiencia relativa de los estimadores, ya que ambos serán consistentes. Para la mayoría de los casos y con más de 2 periodos se verifica que el estimador intragrupos es más eficiente.
+
+```{r}
+
+data('wagepan')
+wagepan.p <- pdata.frame(wagepan, index=c("nr","year"))
+pdim(wagepan.p)
+
+pvar(wagepan.p)
+
+wagepan.p$yr <- factor(wagepan.p$year)
+
+#Pool
+reg.ols <- plm(lwage~educ+black+hisp+exper+I(exper^2)+married+union+yr,
+               data=wagepan.p,model="pooling")
+
+# Efectos aleatorios
+reg.re <- plm(lwage~educ+black+hisp+exper+I(exper^2)+married+union+yr,
+              data=wagepan.p, model="random")
+
+# Efectos fijos
+reg.fe <- plm(lwage~educ+black+hisp+exper+I(exper^2)+married+union+yr,
+              data=wagepan.p, model="within")
+
+stargazer(reg.ols,reg.re,reg.fe,type='text',
+          column.labels=c("OLS","RE","FE"),
+          keep.stat=c("n","rsq"),
+          keep=c("ed","bl","hi","exp","mar","un"))
+
+```
+ 
+ 

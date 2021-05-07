@@ -1,0 +1,99 @@
+---
+title: "Clase 14 - Taller de econometría aplicada"
+author: "Rafael Sandoval"
+date: "21/04/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+packages <- c("tidyverse",
+              "knitr",
+              "devtools",
+              "lmtest",
+              "sandwich",
+              "AER",
+              "stargazer",
+              "plm",
+              "wooldridge",
+              "gplots")
+
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+lapply(packages, 
+       library, 
+       character.only = TRUE)
+
+```
+
+## 2
+
+```{r,results='asis',echo=FALSE}
+filepath <- file.path("C:/Users/rsf94/Google Drive/MAESTRÍA ITAM/2do semestre/taller_econometria/taller_econometria/clase14")
+data <- read.csv(file.path(filepath,'datadid.csv'))
+```
+
+# Estimador de diferencias en diferencias
+```{r}
+data_estimacion <- data %>% dplyr::group_by(Treatment,Group) %>% dplyr::summarise(Y=mean(Empl,na.rm=T))
+
+t1g1 <- data_estimacion %>% filter(Treatment==1,Group==1) 
+t1g1 <- t1g1$Y
+
+t1g0 <- data_estimacion %>% filter(Treatment==1,Group==0) %>% dplyr::select(Y)
+t1g0 <- t1g0$Y
+  
+t0g1 <- data_estimacion %>% filter(Treatment==0,Group==1) %>% dplyr::select(Y)
+t0g1 <- t0g1$Y
+
+t0g0 <- data_estimacion %>% filter(Treatment==0,Group==0) %>% dplyr::select(Y)
+t0g0 <- t0g0$Y
+  
+dif0 <- t0g1-t0g0
+dif1 <- t1g1-t1g0
+did <- dif1 - dif0  
+```
+
+
+```{r}
+# contrafactual
+cf <- t0g1-t0g0+t1g0
+
+
+palette(c(adjustcolor("blue",alpha.f=1),
+adjustcolor("red",alpha.f=1),
+adjustcolor("darkgreen",alpha.f = 1)))
+
+plot(c(0,1,0,1),c(t0g1,t1g1,t0g0,t1g0) ,bty="n",
+     xlim = c(-0.5, 2), ylim = c(4, 15),
+     col = c(1,1,2,2), pch=16, cex=8,
+     xaxt = "n", yaxt = "n",
+     xlab = "", ylab = "",
+     main = "Diferencia en Diferencias")
+points(1,cf,cex=6, col=3)
+segments( x0=0, x1=1, y0=t0g0, y1=t1g0, col=2, lwd=2 )
+segments( x0=0, x1=1, y0=t0g1, y1=t1g1, col=1, lwd=2 )
+segments( x0=0.1, x1=0.9, y0=t0g1, y1=cf,
+col=3, lwd=1, lty=2 )
+text( c(0, 1, 0, 1), c(t0g1,t1g1,t0g0,t1g0),
+round(c(t0g1,t1g1,t0g0,t1g0),2), cex = 1.5, col =" white" )
+axis( side = 1, at=c(0, 1),
+labels=c("Antes","Después" ) )
+text( 1.1, t1g1, "Tratamiento",
+col = "blue", pos = 4, cex = 1 )
+text( 1.1, t1g0, "Control",
+col = "red", pos = 4, cex = 1)
+
+
+
+```
+```{r}
+reg <- lm(Empl ~ Treatment*Group + C.Owned + Hours.Opening + Chain + SouthJ + NorthJ + PA1 + Shore,data)
+
+reg2 <- lm(Empl ~ Treatment*Group + C.Owned + Hours.Opening + Chain,data)
+
+stargazer(reg,reg2,type='text')
+```
